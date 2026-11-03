@@ -37,6 +37,7 @@ export interface WorkforceSegment {
 
 export interface EmployeeActivity {
   id: string;
+  employee_code?: string;
   name: string;
   avatar: string;
   department: string;
@@ -44,6 +45,7 @@ export interface EmployeeActivity {
   timestamp: string;
   status: 'active' | 'on-leave' | 'remote' | 'inactive';
   location: string;
+  role?: string;
   employmentType?: 'Full-time' | 'Part-time' | 'Contractor' | 'Intern';
 }
 
@@ -53,6 +55,26 @@ export interface FilterState {
   department: string[];
   location: string;
   status: string;
+  employmentType?: string;
+}
+
+export interface PaginationState {
+  page: number; // 0-indexed for MUI TablePagination
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface SortState {
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
+}
+
+export interface FilterOptions {
+  departments: string[];
+  locations: string[];
+  statuses: string[];
+  employmentTypes: string[];
 }
 
 export type DataState = 'loading' | 'success' | 'empty' | 'error';

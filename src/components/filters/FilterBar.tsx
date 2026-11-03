@@ -22,17 +22,22 @@ import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded';
 import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded';
 import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
-import { departmentOptions, locationOptions, statusOptions } from '../../data/mockData';
-import type { FilterState } from '../../types';
+import { departmentOptions as defaultDepartmentOptions, locationOptions as defaultLocationOptions, statusOptions as defaultStatusOptions } from '../../data/mockData';
+import type { FilterState, FilterOptions } from '../../types';
 
 interface FilterBarProps {
   filters: FilterState;
   onChange: (filters: FilterState) => void;
+  filterOptions?: FilterOptions;
 }
 
-const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange }) => {
+const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange, filterOptions }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+
+  const departmentList = filterOptions?.departments?.length ? filterOptions.departments : defaultDepartmentOptions;
+  const locationList = filterOptions?.locations?.length ? filterOptions.locations : defaultLocationOptions;
+  const statusList = filterOptions?.statuses?.length ? filterOptions.statuses : defaultStatusOptions;
 
   const handleReset = () => {
     onChange({
@@ -409,7 +414,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange }) => {
                 )
               }
             >
-              {departmentOptions.map((dept) => (
+              {departmentList.map((dept) => (
                 <MenuItem key={dept} value={dept} dense sx={{ borderRadius: 1.5, my: 0.25 }}>
                   <Checkbox
                     checked={filters.department.includes(dept)}
@@ -464,7 +469,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange }) => {
                 />
               }
             >
-              {locationOptions.map((loc) => (
+              {locationList.map((loc) => (
                 <MenuItem key={loc} value={loc} dense sx={{ borderRadius: 1.5, my: 0.25 }}>
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
                     {loc}
@@ -512,7 +517,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange }) => {
                 />
               }
             >
-              {statusOptions.map((s) => (
+              {statusList.map((s) => (
                 <MenuItem key={s} value={s} dense sx={{ borderRadius: 1.5, my: 0.25 }}>
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
                     {s}
