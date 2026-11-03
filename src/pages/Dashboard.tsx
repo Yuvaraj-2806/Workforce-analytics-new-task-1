@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Grid,
@@ -17,6 +17,7 @@ import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded';
 import TableChartRoundedIcon from '@mui/icons-material/TableChartRounded';
 import PictureAsPdfRoundedIcon from '@mui/icons-material/PictureAsPdfRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import StorageRoundedIcon from '@mui/icons-material/StorageRounded';
 import KpiCard from '../components/kpi/KpiCard';
 import AttendanceTrendChart from '../components/charts/AttendanceTrendChart';
 import DepartmentDistributionChart from '../components/charts/DepartmentDistributionChart';
@@ -25,111 +26,65 @@ import RecentActivityTable from '../components/tables/RecentActivityTable';
 import FilterBar from '../components/filters/FilterBar';
 import LoadingState from '../components/common/LoadingState';
 import ErrorState from '../components/common/ErrorState';
-import {
-  kpiData,
-  attendanceTrend,
-  departmentData,
-  workforceSegments,
-  recentActivity,
-} from '../data/mockData';
-import type { DataState, FilterState } from '../types';
-
-const TOTAL_WORKFORCE = workforceSegments.reduce((s, d) => s + d.value, 0);
-
-const DEFAULT_FILTERS: FilterState = {
-  dateFrom: '',
-  dateTo: '',
-  department: [],
-  location: '',
-  status: 'All',
-};
+import { useDashboardData } from '../hooks/useDashboardData';
 
 const Dashboard: React.FC = () => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  const [dataState, setDataState] = useState<DataState>('loading');
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+  const {
+    dataState,
+    errorMessage,
+    filters,
+    setFilters,
+    filterOptions,
+    lastUpdated,
+    selectedSegment,
+    handleSegmentSelect,
+    kpis,
+    attendanceTrend,
+    departmentData,
+    workforceSegments,
+    totalWorkforce,
+    employees,
+    totalEmployees,
+    page,
+    rowsPerPage,
+    sortBy,
+    sortOrder,
+    searchQuery,
+    handleSearchChange,
+    setPage,
+    setRowsPerPage,
+    handleSortChange,
+    handleResetFilters,
+    refresh,
+    exportCSV,
+  } = useDashboardData();
+
   const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
-  const [workforceSegmentFilter, setWorkforceSegmentFilter] = useState<string | null>(null);
 
-  // Simulate initial data load
-  useEffect(() => {
-    const timer = setTimeout(() => setDataState('success'), 1200);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const handleRefresh = () => {
-    setDataState('loading');
-    setTimeout(() => {
-      setDataState('success');
-      setLastUpdated(new Date());
-      setSnackbarMessage('Dashboard metrics synchronized successfully.');
-    }, 1000);
+  const handleRefreshClick = () => {
+    refresh();
+    setSnackbarMessage('Metrics updated from SQLite database.');
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSVClick = () => {
     setExportAnchorEl(null);
-    const headers = ['ID', 'Name', 'Department', 'Location', 'Action', 'Status', 'Timestamp'];
-    const rows = filteredActivity.map((a) => [
-      a.id,
-      `"${a.name}"`,
-      `"${a.department}"`,
-      `"${a.location}"`,
-      `"${a.action}"`,
-      `"${a.status}"`,
-      `"${a.timestamp}"`,
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `stackly-workforce-analytics-${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setSnackbarMessage('Stackly workforce report exported to CSV successfully.');
+    exportCSV();
+    setSnackbarMessage('Workforce data exported to CSV successfully.');
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDFClick = () => {
     setExportAnchorEl(null);
     window.print();
   };
 
-  // Filter activity data
-  const filteredActivity = useMemo(() => {
-    let data = [...recentActivity];
-    if (filters.department.length > 0) {
-      data = data.filter((e) => filters.department.includes(e.department));
-    }
-    if (filters.location && filters.location !== 'All Locations') {
-      data = data.filter((e) => e.location === filters.location);
-    }
-    if (filters.status && filters.status !== 'All') {
-      data = data.filter((e) => {
-        const s = e.status;
-        if (filters.status === 'Active') return s === 'active';
-        if (filters.status === 'On Leave') return s === 'on-leave';
-        if (filters.status === 'Remote') return s === 'remote';
-        if (filters.status === 'Inactive') return s === 'inactive';
-        return true;
-      });
-    }
-    if (workforceSegmentFilter) {
-      data = data.filter((e) => e.employmentType === workforceSegmentFilter);
-    }
-    return data;
-  }, [filters, workforceSegmentFilter]);
-
-  // Filter department data
-  const filteredDepts = useMemo(() => {
-    if (filters.department.length === 0) return departmentData;
-    return departmentData.filter((d) => filters.department.includes(d.department));
-  }, [filters.department]);
-
   if (dataState === 'loading') return <LoadingState />;
-  if (dataState === 'error') return <ErrorState onRetry={handleRefresh} />;
+  if (dataState === 'error') {
+    return <ErrorState message={errorMessage || undefined} onRetry={refresh} />;
+  }
 
   return (
     <Box sx={{ maxWidth: 1600, mx: 'auto' }}>
@@ -157,6 +112,24 @@ const Dashboard: React.FC = () => {
             >
               Workforce Intelligence Overview
             </Typography>
+            <Box
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.5,
+                bgcolor: 'rgba(16,185,129,0.1)',
+                color: '#10b981',
+                border: '1px solid rgba(16,185,129,0.2)',
+                borderRadius: 1.5,
+                px: 1,
+                py: 0.2,
+                fontSize: '0.72rem',
+                fontWeight: 700,
+              }}
+            >
+              <StorageRoundedIcon sx={{ fontSize: 13 }} />
+              SQLite Connected
+            </Box>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.825rem' }}>
@@ -187,7 +160,7 @@ const Dashboard: React.FC = () => {
             variant="outlined"
             size="small"
             startIcon={<AutorenewRoundedIcon sx={{ fontSize: 18 }} />}
-            onClick={handleRefresh}
+            onClick={handleRefreshClick}
             sx={{
               borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
               color: theme.palette.text.primary,
@@ -248,13 +221,13 @@ const Dashboard: React.FC = () => {
               },
             }}
           >
-            <MenuItem onClick={handleExportCSV} sx={{ py: 1, borderRadius: 1.5, fontSize: '0.85rem' }}>
+            <MenuItem onClick={handleExportCSVClick} sx={{ py: 1, borderRadius: 1.5, fontSize: '0.85rem' }}>
               <ListItemIcon sx={{ minWidth: 30, color: '#10b981' }}>
                 <TableChartRoundedIcon fontSize="small" />
               </ListItemIcon>
               Export as CSV
             </MenuItem>
-            <MenuItem onClick={handleExportPDF} sx={{ py: 1, borderRadius: 1.5, fontSize: '0.85rem' }}>
+            <MenuItem onClick={handleExportPDFClick} sx={{ py: 1, borderRadius: 1.5, fontSize: '0.85rem' }}>
               <ListItemIcon sx={{ minWidth: 30, color: '#ef4444' }}>
                 <PictureAsPdfRoundedIcon fontSize="small" />
               </ListItemIcon>
@@ -265,17 +238,21 @@ const Dashboard: React.FC = () => {
       </Box>
 
       {/* Filter Bar */}
-      <FilterBar filters={filters} onChange={setFilters} />
+      <FilterBar
+        filters={filters}
+        onChange={setFilters}
+        filterOptions={filterOptions}
+      />
 
-      {/* KPI Cards Grid — Unified Equal Height & Interactive Control Pods */}
+      {/* KPI Cards Grid — 5 Responsive Cards from SQLite */}
       <Grid container spacing={2.5} sx={{ mb: 3, alignItems: 'stretch' }}>
-        {kpiData.map((kpi, idx) => {
+        {kpis.map((kpi, idx) => {
           const isSelected =
-            (kpi.id === 'present-today' && filters.status === 'Active') ||
+            (kpi.id === 'present' && filters.status === 'Active') ||
             (kpi.id === 'on-leave' && filters.status === 'On Leave');
 
           const handleCardClick = () => {
-            if (kpi.id === 'present-today') {
+            if (kpi.id === 'present') {
               setFilters((prev) => ({
                 ...prev,
                 status: prev.status === 'Active' ? 'All' : 'Active',
@@ -316,10 +293,10 @@ const Dashboard: React.FC = () => {
           <Box sx={{ height: { xs: 365, sm: 375, md: 390 } }}>
             <WorkforceDonutChart
               data={workforceSegments}
-              total={TOTAL_WORKFORCE}
-              selectedSegment={workforceSegmentFilter}
+              total={totalWorkforce}
+              selectedSegment={selectedSegment}
               onSegmentSelect={(segment) => {
-                setWorkforceSegmentFilter(segment);
+                handleSegmentSelect(segment);
                 if (segment) {
                   setSnackbarMessage(`Displaying related records for ${segment} workforce.`);
                 }
@@ -333,14 +310,25 @@ const Dashboard: React.FC = () => {
       <Grid container spacing={2.5} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, md: 5 }}>
           <Box sx={{ height: 520 }}>
-            <DepartmentDistributionChart data={filteredDepts} />
+            <DepartmentDistributionChart data={departmentData} />
           </Box>
         </Grid>
         <Grid size={{ xs: 12, md: 7 }}>
           <RecentActivityTable
-            data={filteredActivity}
-            activeEmploymentFilter={workforceSegmentFilter}
-            onClearEmploymentFilter={() => setWorkforceSegmentFilter(null)}
+            data={employees}
+            total={totalEmployees}
+            page={page}
+            rowsPerPage={rowsPerPage}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            searchQuery={searchQuery}
+            onSearchChange={handleSearchChange}
+            onPageChange={setPage}
+            onRowsPerPageChange={setRowsPerPage}
+            onSortChange={handleSortChange}
+            activeEmploymentFilter={selectedSegment}
+            onClearEmploymentFilter={() => handleSegmentSelect(null)}
+            onResetAllFilters={handleResetFilters}
           />
         </Grid>
       </Grid>
