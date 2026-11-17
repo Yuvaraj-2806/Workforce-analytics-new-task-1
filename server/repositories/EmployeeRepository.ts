@@ -174,6 +174,18 @@ export class EmployeeRepository {
   }
 
   /**
+   * Finds single employee by ID with department info
+   */
+  public findById(id: number): any {
+    return db.prepare(`
+      SELECT e.*, d.name AS department_name, d.color AS department_color
+      FROM employees e
+      JOIN departments d ON e.department_id = d.id
+      WHERE e.id = ?
+    `).get(id);
+  }
+
+  /**
    * Retrieves distinct list of locations in DB
    */
   public getLocations(): string[] {

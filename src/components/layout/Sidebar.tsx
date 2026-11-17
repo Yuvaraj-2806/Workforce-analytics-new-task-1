@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Drawer,
@@ -25,6 +26,12 @@ import WorkspacesRoundedIcon from '@mui/icons-material/WorkspacesRounded';
 import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
 import AccountTreeRoundedIcon from '@mui/icons-material/AccountTreeRounded';
 import HelpOutlineRoundedIcon from '@mui/icons-material/HelpOutlineRounded';
+import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
+import SecurityRoundedIcon from '@mui/icons-material/SecurityRounded';
+import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded';
+import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
+import { useAuth } from '../../context/AuthContext';
+import { ROLE_COLORS, ROLE_LABELS } from '../../types/auth';
 
 const SIDEBAR_WIDTH_OPEN = 240;
 const SIDEBAR_WIDTH_CLOSED = 64;
@@ -32,24 +39,10 @@ const SIDEBAR_WIDTH_CLOSED = 64;
 interface NavItem {
   label: string;
   icon: React.ReactNode;
-  active?: boolean;
+  path?: string;
   badge?: number;
+  roles?: string[];
 }
-
-const primaryNav: NavItem[] = [
-  { label: 'Dashboard', icon: <DashboardRoundedIcon />, active: true },
-  { label: 'Employees', icon: <PeopleRoundedIcon /> },
-  { label: 'Attendance', icon: <EventNoteRoundedIcon /> },
-  { label: 'Departments', icon: <AccountTreeRoundedIcon /> },
-  { label: 'Workforce', icon: <WorkspacesRoundedIcon /> },
-  { label: 'Analytics', icon: <BarChartRoundedIcon /> },
-  { label: 'Calendar', icon: <CalendarMonthRoundedIcon /> },
-];
-
-const secondaryNav: NavItem[] = [
-  { label: 'Settings', icon: <SettingsRoundedIcon /> },
-  { label: 'Help & Support', icon: <HelpOutlineRoundedIcon /> },
-];
 
 interface SidebarProps {
   open: boolean;
@@ -62,6 +55,85 @@ interface SidebarProps {
 const SidebarContent: React.FC<{ open: boolean; onToggle: () => void }> = ({ open, onToggle }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+
+  const userDisplayName = user?.fullName || (user?.email ? user.email.split('@')[0] : 'User');
+  const userInitials = (user?.fullName ? user.fullName[0] : (user?.email ? user.email[0] : 'U')).toUpperCase();
+  const roleLabel = user ? (ROLE_LABELS[user.role] || user.role) : 'Authorized User';
+  const roleColor = user ? (ROLE_COLORS[user.role] || '#6366f1') : '#6366f1';
+
+  // Dynamically curated navigation items based on active RBAC role
+  let primaryNav: NavItem[] = [];
+
+  if (user?.role === 'admin') {
+    primaryNav = [
+      { label: 'Overview', icon: <DashboardRoundedIcon />, path: '/dashboard' },
+      { label: 'Employees', icon: <PeopleRoundedIcon />, path: '/dashboard' },
+      { label: 'Attendance', icon: <EventNoteRoundedIcon />, path: '/dashboard' },
+      { label: 'Departments', icon: <AccountTreeRoundedIcon />, path: '/dashboard' },
+      { label: 'Workforce', icon: <WorkspacesRoundedIcon />, path: '/dashboard' },
+      { label: 'Admin Control', icon: <AdminPanelSettingsRoundedIcon />, path: '/admin' },
+      { label: 'Audit Logs', icon: <SecurityRoundedIcon />, path: '/admin' },
+    ];
+  } else if (user?.role === 'hr') {
+    primaryNav = [
+      { label: 'Dashboard', icon: <DashboardRoundedIcon />, path: '/dashboard' },
+      { label: 'Employees', icon: <PeopleRoundedIcon />, path: '/dashboard' },
+      { label: 'Attendance', icon: <EventNoteRoundedIcon />, path: '/dashboard' },
+      { label: 'Departments', icon: <AccountTreeRoundedIcon />, path: '/dashboard' },
+      { label: 'Workforce', icon: <WorkspacesRoundedIcon />, path: '/dashboard' },
+      { label: 'Analytics', icon: <BarChartRoundedIcon />, path: '/dashboard' },
+      { label: 'Calendar', icon: <CalendarMonthRoundedIcon />, path: '/dashboard' },
+    ];
+  } else if (user?.role === 'manager') {
+    primaryNav = [
+      { label: 'Department Ops', icon: <BusinessRoundedIcon />, path: '/manager-dashboard' },
+      { label: 'Team Members', icon: <PeopleRoundedIcon />, path: '/manager-dashboard' },
+      { label: 'Team Attendance', icon: <EventNoteRoundedIcon />, path: '/manager-dashboard' },
+      { label: 'Workforce Analytics', icon: <BarChartRoundedIcon />, path: '/manager-dashboard' },
+    ];
+  } else if (user?.role === 'team_lead') {
+    primaryNav = [
+      { label: 'Team Operations', icon: <WorkspacesRoundedIcon />, path: '/team-lead-dashboard' },
+      { label: 'Team Members', icon: <PeopleRoundedIcon />, path: '/team-lead-dashboard' },
+      { label: 'Daily Attendance', icon: <EventNoteRoundedIcon />, path: '/team-lead-dashboard' },
+      { label: 'My Profile', icon: <PersonRoundedIcon />, path: '/employee-dashboard' },
+    ];
+  } else if (user?.role === 'employee') {
+    primaryNav = [
+      { label: 'My Workspace', icon: <DashboardRoundedIcon />, path: '/employee-dashboard' },
+      { label: 'My Attendance', icon: <EventNoteRoundedIcon />, path: '/employee-dashboard' },
+      { label: 'My Profile', icon: <PersonRoundedIcon />, path: '/employee-dashboard' },
+    ];
+  } else {
+    primaryNav = [
+      { label: 'Dashboard', icon: <DashboardRoundedIcon />, path: '/dashboard' },
+      { label: 'Employees', icon: <PeopleRoundedIcon />, path: '/dashboard' },
+      { label: 'Attendance', icon: <EventNoteRoundedIcon />, path: '/dashboard' },
+    ];
+  }
+
+  // Common Secondary Navigation
+  const secondaryNav: NavItem[] = [
+    { label: 'Settings', icon: <SettingsRoundedIcon />, path: '/dashboard' },
+    { label: 'Help & Support', icon: <HelpOutlineRoundedIcon />, path: '/dashboard' },
+  ];
+
+  const handleNavClick = (item: NavItem) => {
+    if (item.path) {
+      navigate(item.path);
+    }
+  };
+
+  const isItemActive = (item: NavItem) => {
+    if (!item.path) return false;
+    if (item.path === '/dashboard') {
+      return location.pathname === '/dashboard' || location.pathname === '/';
+    }
+    return location.pathname === item.path;
+  };
 
   return (
     <Box
@@ -76,7 +148,7 @@ const SidebarContent: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         width: open ? SIDEBAR_WIDTH_OPEN : SIDEBAR_WIDTH_CLOSED,
       }}
     >
-      {/* Brand */}
+      {/* Brand Header */}
       <Box
         sx={{
           display: 'flex',
@@ -87,6 +159,7 @@ const SidebarContent: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         }}
       >
         <Box
+          onClick={() => navigate('/dashboard')}
           sx={{
             width: 36,
             height: 36,
@@ -97,6 +170,7 @@ const SidebarContent: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
             justifyContent: 'center',
             flexShrink: 0,
             boxShadow: '0 4px 12px rgba(99,102,241,0.4)',
+            cursor: 'pointer',
           }}
         >
           <WorkspacesRoundedIcon sx={{ color: '#fff', fontSize: 20 }} />
@@ -113,7 +187,7 @@ const SidebarContent: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         </Collapse>
       </Box>
 
-      {/* Toggle */}
+      {/* Toggle Button */}
       <Box sx={{ px: open ? 1 : '4px', display: 'flex', justifyContent: open ? 'flex-end' : 'center', mb: 1 }}>
         <IconButton
           onClick={onToggle}
@@ -133,7 +207,7 @@ const SidebarContent: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
 
       <Divider sx={{ mx: 1, mb: 1 }} />
 
-      {/* Primary Nav */}
+      {/* Navigation Links */}
       <Box
         sx={{
           flex: 1,
@@ -144,59 +218,64 @@ const SidebarContent: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
           '&::-webkit-scrollbar': { display: 'none' },
         }}
       >
+        {/* Main Menu Header */}
         {open && (
           <Typography variant="overline" sx={{ px: 2.5, mb: 0.25, display: 'block', color: theme.palette.text.secondary }}>
-            Main Menu
+            {user ? `${ROLE_LABELS[user.role] || user.role} Navigation` : 'Main Menu'}
           </Typography>
         )}
         <List dense disablePadding>
-          {primaryNav.map((item) => (
-            <Tooltip key={item.label} title={!open ? item.label : ''} placement="right" arrow>
-              <ListItemButton
-                selected={item.active}
-                sx={{
-                  px: open ? 2 : 1.5,
-                  py: 0.75,
-                  mx: 1,
-                  mb: 0.25,
-                  borderRadius: 2,
-                  justifyContent: open ? 'flex-start' : 'center',
-                  minHeight: 38,
-                  '&.Mui-selected': {
-                    background: 'linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(99,102,241,0.06) 100%)',
-                    borderLeft: '3px solid #6366f1',
-                    pl: open ? 1.625 : 1.125,
-                    '& .MuiListItemIcon-root': { color: '#6366f1' },
-                    '& .MuiListItemText-primary': { color: '#6366f1', fontWeight: 700 },
-                  },
-                  '&:hover': {
-                    bgcolor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                  },
-                }}
-              >
-                <ListItemIcon
+          {primaryNav.map((item) => {
+            const active = isItemActive(item);
+            return (
+              <Tooltip key={item.label} title={!open ? item.label : ''} placement="right" arrow>
+                <ListItemButton
+                  selected={active}
+                  onClick={() => handleNavClick(item)}
                   sx={{
-                    minWidth: open ? 36 : 'unset',
-                    color: item.active ? '#6366f1' : theme.palette.text.secondary,
-                    justifyContent: 'center',
+                    px: open ? 2 : 1.5,
+                    py: 0.75,
+                    mx: 1,
+                    mb: 0.25,
+                    borderRadius: 2,
+                    justifyContent: open ? 'flex-start' : 'center',
+                    minHeight: 38,
+                    '&.Mui-selected': {
+                      background: 'linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(99,102,241,0.06) 100%)',
+                      borderLeft: '3px solid #6366f1',
+                      pl: open ? 1.625 : 1.125,
+                      '& .MuiListItemIcon-root': { color: '#6366f1' },
+                      '& .MuiListItemText-primary': { color: '#6366f1', fontWeight: 700 },
+                    },
+                    '&:hover': {
+                      bgcolor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                    },
                   }}
                 >
-                  {item.icon}
-                </ListItemIcon>
-                <Collapse in={open} orientation="horizontal" timeout={200}>
-                  <ListItemText
-                    primary={item.label}
-                    slotProps={{ primary: { sx: { fontSize: '0.875rem', fontWeight: item.active ? 700 : 500, whiteSpace: 'nowrap' } } }}
-                    sx={{ m: 0 }}
-                  />
-                </Collapse>
-              </ListItemButton>
-            </Tooltip>
-          ))}
+                  <ListItemIcon
+                    sx={{
+                      minWidth: open ? 36 : 'unset',
+                      color: active ? '#6366f1' : theme.palette.text.secondary,
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {item.icon}
+                  </ListItemIcon>
+                  <Collapse in={open} orientation="horizontal" timeout={200}>
+                    <ListItemText
+                      primary={item.label}
+                      slotProps={{ primary: { sx: { fontSize: '0.875rem', fontWeight: active ? 700 : 500, whiteSpace: 'nowrap' } } }}
+                      sx={{ m: 0 }}
+                    />
+                  </Collapse>
+                </ListItemButton>
+              </Tooltip>
+            );
+          })}
         </List>
 
+        {/* System Section */}
         <Divider sx={{ mx: 1, my: 1 }} />
-
         {open && (
           <Typography variant="overline" sx={{ px: 2.5, mb: 0.25, display: 'block', color: theme.palette.text.secondary }}>
             System
@@ -241,7 +320,7 @@ const SidebarContent: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         </List>
       </Box>
 
-      {/* User Profile */}
+      {/* User Profile Footer */}
       <Divider sx={{ mx: 1, mt: 1 }} />
       <Box
         sx={{
@@ -256,21 +335,21 @@ const SidebarContent: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
           sx={{
             width: 36,
             height: 36,
-            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            background: `linear-gradient(135deg, ${roleColor} 0%, #6366f1 100%)`,
             fontSize: '0.875rem',
             fontWeight: 700,
             flexShrink: 0,
           }}
         >
-          Y
+          {userInitials}
         </Avatar>
         <Collapse in={open} orientation="horizontal" timeout={200}>
           <Box sx={{ whiteSpace: 'nowrap' }}>
             <Typography variant="body2" sx={{ fontWeight: 600, color: theme.palette.text.primary, fontSize: '0.8125rem' }}>
-              Yuvaraj
+              {userDisplayName}
             </Typography>
-            <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-              HR Administrator
+            <Typography variant="caption" sx={{ color: roleColor, fontWeight: 700, fontSize: '0.7rem' }}>
+              {roleLabel}
             </Typography>
           </Box>
         </Collapse>
@@ -300,12 +379,14 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onToggle, variant = 'permanent'
     );
   }
 
+  // Desktop: Normal flex child box that pushes main content side-by-side, NEVER positioning over content!
   return (
     <Box
       component="nav"
       sx={{
         width: open ? SIDEBAR_WIDTH_OPEN : SIDEBAR_WIDTH_CLOSED,
         flexShrink: 0,
+        height: '100%',
         transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1)',
       }}
     >
@@ -314,4 +395,5 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onToggle, variant = 'permanent'
   );
 };
 
+export { Sidebar };
 export default Sidebar;

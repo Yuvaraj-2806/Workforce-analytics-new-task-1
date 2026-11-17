@@ -22,10 +22,16 @@ import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
-import PersonOutlineRoundedIcon from '@mui/icons-material/PersonOutlineRounded';
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import SecurityRoundedIcon from '@mui/icons-material/SecurityRounded';
+import DevicesRoundedIcon from '@mui/icons-material/DevicesRounded';
+import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { ROLE_COLORS, ROLE_LABELS } from '../../types/auth';
+import { MFAModal } from '../auth/MFAModal';
+import { SessionsModal } from '../auth/SessionsModal';
 
 interface TopNavProps {
   onThemeToggle: () => void;
@@ -36,9 +42,18 @@ interface TopNavProps {
 
 const TopNav: React.FC<TopNavProps> = ({ onThemeToggle, isDark, onMobileMenuToggle, onRefresh }) => {
   const theme = useTheme();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [mfaOpen, setMfaOpen] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
   const userMenuOpen = Boolean(anchorEl);
+
+  const userInitials = (user?.fullName ? user.fullName.slice(0, 2) : user?.email?.slice(0, 2) || 'WA').toUpperCase();
+  const userDisplayName = user?.fullName || user?.email?.split('@')[0] || 'User';
+  const roleLabel = ROLE_LABELS[user?.role || 'employee'];
+  const roleColor = ROLE_COLORS[user?.role || 'employee'];
 
   const handleRefreshClick = () => {
     setIsRefreshing(true);
@@ -379,13 +394,13 @@ const TopNav: React.FC<TopNavProps> = ({ onThemeToggle, isDark, onMobileMenuTogg
                 sx={{
                   width: 34,
                   height: 34,
-                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  background: `linear-gradient(135deg, ${roleColor} 0%, #6366f1 100%)`,
                   fontSize: '0.8rem',
                   fontWeight: 700,
                   boxShadow: '0 2px 8px rgba(99,102,241,0.35)',
                 }}
               >
-                Y
+                {userInitials}
               </Avatar>
             </Badge>
 
@@ -408,19 +423,20 @@ const TopNav: React.FC<TopNavProps> = ({ onThemeToggle, isDark, onMobileMenuTogg
                   whiteSpace: 'nowrap',
                 }}
               >
-                Yuvaraj
+                {userDisplayName}
               </Typography>
               <Typography
                 variant="caption"
                 sx={{
-                  color: theme.palette.text.secondary,
+                  color: roleColor,
+                  fontWeight: 700,
                   fontSize: '0.7rem',
                   lineHeight: 1.1,
                   display: 'block',
                   whiteSpace: 'nowrap',
                 }}
               >
-                HR Administrator
+                {roleLabel}
               </Typography>
             </Box>
 
@@ -440,14 +456,13 @@ const TopNav: React.FC<TopNavProps> = ({ onThemeToggle, isDark, onMobileMenuTogg
             anchorEl={anchorEl}
             open={userMenuOpen}
             onClose={handleUserClose}
-            onClick={handleUserClose}
             transformOrigin={{ horizontal: 'right', vertical: 'top' }}
             anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             slotProps={{
               paper: {
                 sx: {
                   mt: 1.25,
-                  width: 220,
+                  width: 240,
                   borderRadius: 2.5,
                   boxShadow: isDark
                     ? '0 12px 32px rgba(0,0,0,0.6)'
@@ -461,32 +476,58 @@ const TopNav: React.FC<TopNavProps> = ({ onThemeToggle, isDark, onMobileMenuTogg
           >
             <Box sx={{ px: 2, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
               <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                Yuvaraj
+                {userDisplayName}
               </Typography>
               <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                yuvaraj@stackly.io
+                {user?.email}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                <CheckCircleRoundedIcon sx={{ fontSize: 13, color: '#10b981' }} />
-                <Typography variant="caption" sx={{ color: '#10b981', fontWeight: 600 }}>
-                  Active Administrator
+                <CheckCircleRoundedIcon sx={{ fontSize: 13, color: roleColor }} />
+                <Typography variant="caption" sx={{ color: roleColor, fontWeight: 700 }}>
+                  {roleLabel}
                 </Typography>
               </Box>
             </Box>
-            <MenuItem sx={{ py: 1, borderRadius: 1.5, my: 0.25, fontSize: '0.85rem' }}>
-              <ListItemIcon sx={{ minWidth: 32 }}>
-                <PersonOutlineRoundedIcon fontSize="small" />
-              </ListItemIcon>
-              My Profile
-            </MenuItem>
-            <MenuItem sx={{ py: 1, borderRadius: 1.5, my: 0.25, fontSize: '0.85rem' }}>
-              <ListItemIcon sx={{ minWidth: 32 }}>
-                <SettingsOutlinedIcon fontSize="small" />
-              </ListItemIcon>
-              Account Settings
-            </MenuItem>
-            <Divider sx={{ my: 0.5 }} />
+
+            {user?.role === 'admin' && (
+              <MenuItem
+                onClick={() => { handleUserClose(); navigate('/admin'); }}
+                sx={{ py: 1, borderRadius: 1.5, my: 0.25, fontSize: '0.85rem' }}
+              >
+                <ListItemIcon sx={{ minWidth: 32 }}>
+                  <AdminPanelSettingsRoundedIcon fontSize="small" sx={{ color: '#ef4444' }} />
+                </ListItemIcon>
+                Admin Control Panel
+              </MenuItem>
+            )}
+
             <MenuItem
+              onClick={() => { handleUserClose(); setMfaOpen(true); }}
+              sx={{ py: 1, borderRadius: 1.5, my: 0.25, fontSize: '0.85rem' }}
+            >
+              <ListItemIcon sx={{ minWidth: 32 }}>
+                <SecurityRoundedIcon fontSize="small" sx={{ color: '#6366f1' }} />
+              </ListItemIcon>
+              Two-Factor Auth (2FA)
+            </MenuItem>
+
+            <MenuItem
+              onClick={() => { handleUserClose(); setSessionsOpen(true); }}
+              sx={{ py: 1, borderRadius: 1.5, my: 0.25, fontSize: '0.85rem' }}
+            >
+              <ListItemIcon sx={{ minWidth: 32 }}>
+                <DevicesRoundedIcon fontSize="small" sx={{ color: '#3b82f6' }} />
+              </ListItemIcon>
+              Active Sessions
+            </MenuItem>
+
+            <Divider sx={{ my: 0.5 }} />
+
+            <MenuItem
+              onClick={() => {
+                handleUserClose();
+                logout().then(() => navigate('/login'));
+              }}
               sx={{
                 py: 1,
                 borderRadius: 1.5,
@@ -501,6 +542,12 @@ const TopNav: React.FC<TopNavProps> = ({ onThemeToggle, isDark, onMobileMenuTogg
               Sign Out
             </MenuItem>
           </Menu>
+
+          {/* MFA Management Modal */}
+          <MFAModal open={mfaOpen} onClose={() => setMfaOpen(false)} />
+
+          {/* Active Sessions Modal */}
+          <SessionsModal open={sessionsOpen} onClose={() => setSessionsOpen(false)} />
         </Box>
       </Toolbar>
     </AppBar>

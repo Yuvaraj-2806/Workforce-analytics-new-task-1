@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { departmentRepository } from '../repositories/DepartmentRepository';
-import { employeeRepository } from '../repositories/EmployeeRepository';
+import { departmentRepository } from '../repositories/DepartmentRepository.js';
+import { employeeRepository } from '../repositories/EmployeeRepository.js';
 
 export class FilterController {
   public getOptions(_req: Request, res: Response): void {

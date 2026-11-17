@@ -1,302 +1,284 @@
-# 🚀 Stackly — Enterprise Workforce Analytics Platform (Task 2)
+# 🚀 Stackly — Enterprise Workforce Analytics Platform (WFA)
+## Task 3: Authentication, Authorization & Role-Based Access Control (RBAC)
 
 [![React](https://img.shields.io/badge/React-19.3.1-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Material UI](https://img.shields.io/badge/Material--UI-v9-007FFF?logo=mui&logoColor=white)](https://mui.com/)
 [![Express.js](https://img.shields.io/badge/Express-5.3-000000?logo=express&logoColor=white)](https://expressjs.com/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL--Mode-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![Vite](https://img.shields.io/badge/Vite-8.3-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Security](https://img.shields.io/badge/Security-AES--256--GCM%20%7C%20TOTP%20MFA-10b981?logo=shield&logoColor=white)](#-security-architecture)
+[![Test Suite](https://img.shields.io/badge/Tests-27%2F27%20Passed%20(100%25)-brightgreen)](#-automated-testing-suite)
 
-An enterprise-grade, responsive Workforce Analytics Platform engineered for **Stackly**. Built with a decoupled frontend architecture, a Node.js/Express REST API adhering to the **Repository Pattern**, and a persistent **SQLite** database operating with Write-Ahead Logging (WAL) for concurrent reads and writes.
+An enterprise-grade, highly secure Workforce Analytics Platform engineered for **Stackly**. Built with a decoupled frontend architecture, a hardened Express REST API adhering to the **Repository Pattern**, and a persistent, version-controlled **SQLite** database operating with Write-Ahead Logging (WAL) and `PRAGMA foreign_keys = ON`.
 
 ---
 
 ## 📑 Table of Contents
-1. [Architecture Overview](#-architecture-overview)
-2. [Key Features & Task 2 Deliverables](#-key-features--task-2-deliverables)
-3. [SQLite Database Design & Schema](#-sqlite-database-design--schema)
-4. [Backend Architecture & Repository Pattern](#-backend-architecture--repository-pattern)
-5. [REST API Documentation](#-rest-api-documentation)
-6. [Frontend Modular Architecture](#-frontend-modular-architecture)
-7. [Installation & Execution Guide](#-installation--execution-guide)
-8. [UI/UX & Accessibility Highlights](#-uiux--accessibility-highlights)
-9. [Verification & Test Results](#-verification--test-results)
+1. [Executive Summary & Task 3 Deliverables](#-executive-summary--task-3-deliverables)
+2. [Demo Credentials & Quick Start](#-demo-credentials--quick-start)
+3. [Architecture Overview](#-architecture-overview)
+4. [SQLite Database Migration Engine](#-sqlite-database-migration-engine)
+5. [Authentication & MFA Implementation](#-authentication--mfa-implementation)
+6. [Role-Based Access Control (RBAC) & IDOR Defense](#-role-based-access-control-rbac--idor-defense)
+7. [Multi-Device Session Management](#-multi-device-session-management)
+8. [Automated Testing Suite (Unit, Integration, Security, E2E)](#-automated-testing-suite)
+9. [Screenshots Gallery](#-screenshots-gallery)
+10. [Technical Documentation Index](#-technical-documentation-index)
+11. [Installation & Execution Guide](#-installation--execution-guide)
+
+---
+
+## 🌟 Executive Summary & Task 3 Deliverables
+
+All mandatory Task 3 requirements have been implemented and verified:
+
+- ✅ **Version-Controlled SQLite Migration System:** 7 numbered SQL migration files managed by an atomic runner that tracks versions in `schema_migrations`, prevents duplicate executions, and strictly preserves existing legacy tables (`departments`, `employees`, `attendance`, `activity_logs`).
+- ✅ **Secure JWT Authentication & Token Rotation:** In-memory short-lived access tokens (15m) paired with secure HttpOnly, SameSite cookies for refresh tokens (7d). Implements **Token Family Rotation** with automatic **Token Reuse Detection** to neutralize stolen token replays.
+- ✅ **Google Authenticator (TOTP) MFA:** RFC 6238-compliant Two-Factor Authentication. TOTP secrets are encrypted at rest in SQLite using **AES-256-GCM** with unique 12-byte IVs. Includes 8 hashed, single-use backup recovery codes.
+- ✅ **Role-Based Access Control (5 Roles & 13 Permissions):** Enforces separate data access boundaries for **Admin**, **HR Specialist**, **Department Manager**, **Team Lead**, and **Regular Employee**. Data filtering is enforced at the database level on the backend.
+- ✅ **Insecure Direct Object Reference (IDOR) Defense:** API-level resource authorization guards prevent users from accessing or modifying other employees' data by altering URL identifiers.
+- ✅ **Multi-Device Session Management:** SQLite-backed session tracking with device fingerprinting, active session inspection, remote single-session revocation, and global logout across all devices (`/api/auth/logout-all`).
+- ✅ **API Security Hardening:** Helmet CSP directives, strict CORS origin whitelisting with credential support, IP-based rate limiting, 15-minute brute-force account lockout after 5 failed attempts, and CSRF protection.
+- ✅ **Security Audit Logging:** Synchronous event logging across all authentication, session, token rotation, IDOR attempts, and administrative actions stored in `auth_audit_logs`.
+- ✅ **Comprehensive Automated Testing:** 4 test suites (Unit, Integration, Security, E2E) executing 27 assertions against real SQLite data with **100% pass rate**.
+
+---
+
+## 🔑 Demo Credentials & Quick Start
+
+The platform seeds 5 demo users with distinct roles and linked employee records:
+
+| Role | Email Address | Password | Department Scope | MFA Status | Access Capabilities |
+|---|---|---|---|---|---|
+| **Admin** | `admin@wfa.com` | `Admin@123!` | Global (All) | Optional | Full platform administration, audit logs, user management, database re-seeding |
+| **HR Specialist** | `hr@wfa.com` | `Hr@123456!` | Company-Wide | Optional | Company-wide employee directory, attendance trends, workforce KPIs |
+| **Department Manager**| `manager@wfa.com` | `Manager@1!` | Engineering Only | Optional | Department-scoped KPIs and team member analytics for Engineering |
+| **Team Lead** | `teamlead@wfa.com` | `Tlead@123!` | Product & Design Only | Optional | Scoped team attendance, sprint monitoring, and activity tracking |
+| **Employee** | `employee@wfa.com`| `Emp@123456!` | Own Profile Only | Optional | Personal profile, attendance calendar, and individual timesheet |
 
 ---
 
 ## 🏛 Architecture Overview
 
-The system strictly follows SOLID principles and enforces a clear separation between the presentation layer, client-side business logic, API communication services, backend controllers, repositories, and the relational database.
-
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        CLIENT LAYER (React 19 + MUI)                   │
-│                                                                        │
-│   ┌────────────────────┐   ┌───────────────────┐   ┌───────────────┐   │
-│   │   Sidebar & Nav    │   │  5 Live KPI Cards │   │ Filter Bar    │   │
-│   └────────────────────┘   └───────────────────┘   └───────────────┘   │
-│   ┌────────────────────────────────────────────────────────────────┐   │
-│   │           Interactive Charts & Analytics Grid                  │   │
-│   │   • Attendance Trend  • Dept Headcount  • Workforce Donut      │   │
-│   └────────────────────────────────────────────────────────────────┘   │
-│   ┌────────────────────────────────────────────────────────────────┐   │
-│   │       Employee Directory (Search + Sort + MUI Pagination)      │   │
-│   └────────────────────────────────────────────────────────────────┘   │
-│                                   │                                    │
-│                     ┌─────────────▼─────────────┐                      │
-│                     │   useDashboardData Hook   │                      │
-│                     └─────────────┬─────────────┘                      │
-│                                   │                                    │
-│                     ┌─────────────▼─────────────┐                      │
-│                     │  API Client Service Layer │                      │
-│                     └─────────────┬─────────────┘                      │
-└───────────────────────────────────┼────────────────────────────────────┘
-                                    │ HTTP / REST (/api)
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                   BACKEND API LAYER (Node.js + Express)                │
-│                                                                        │
-│   ┌────────────────────────────────────────────────────────────────┐   │
-│   │    Express API Routes (/api/kpi, /api/employees, /api/charts)   │   │
-│   └───────────────────────────────┬────────────────────────────────┘   │
-│                                   │                                    │
-│   ┌───────────────────────────────▼────────────────────────────────┐   │
-│   │    Controllers (DashboardController, EmployeeController, etc.) │   │
-│   └───────────────────────────────┬────────────────────────────────┘   │
-│                                   │                                    │
-│   ┌───────────────────────────────▼────────────────────────────────┐   │
-│   │    Repository Layer (Repository Pattern)                       │   │
-│   │    • EmployeeRepository     • AttendanceRepository             │   │
-│   │    • DepartmentRepository   • ActivityRepository               │   │
-│   └───────────────────────────────┬────────────────────────────────┘   │
-└───────────────────────────────────┼────────────────────────────────────┘
-                                    │ Prepared SQL Statements
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                       PERSISTENCE LAYER (SQLite 3)                     │
-│                                                                        │
-│   • departments      • employees        • attendance                   │
-│   • activity_logs    • WAL Journal Mode • B-Tree Indexes               │
-└────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│                           CLIENT PRESENTATION LAYER (React 19)                    │
+│                                                                                   │
+│   ┌────────────────────┐   ┌───────────────────────────┐   ┌──────────────────┐   │
+│   │   Role Navigation  │   │   Role-Based Dashboards   │   │  MFA Modal / TOTP│   │
+│   │   Sidebar & TopNav │   │   • Admin Control Center  │   │  QR Code + Codes │   │
+│   │   Active Role Pill │   │   • Overview (HR/Exec)    │   └──────────────────┘   │
+│   └────────────────────┘   │   • Manager (Dept Scoped) │   ┌──────────────────┐   │
+│                            │   • Team Lead (Sprint Log)│   │  Sessions Modal  │   │
+│                            │   • Employee (My Profile) │   │  Multi-Device UI │   │
+│                            └───────────────────────────┘   └──────────────────┘   │
+│                                           │                                       │
+│                           ┌───────────────▼──────────────┐                        │
+│                           │      AuthContext Provider    │                        │
+│                           │   (Access Token in Memory)   │                        │
+│                           └───────────────┬──────────────┘                        │
+└───────────────────────────────────────────┼───────────────────────────────────────┘
+                                            │ HTTP (Bearer JWT + Cookie + CSRF)
+                                            ▼
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│                        GATEWAY & MIDDLEWARE LAYER (Express 5)                     │
+│                                                                                   │
+│   • Helmet CSP Security Headers       • Strict CORS Whitelist with Credentials    │
+│   • IP Rate Limiter & Account Lockout • authenticateJWT & Session Verification    │
+│   • requireRole / requirePermission   • verifyEmployeeOwnership (IDOR Guard)      │
+└───────────────────────────────────────────┬───────────────────────────────────────┘
+                                            │
+                                            ▼
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│                    RELATIONAL PERSISTENCE ENGINE (SQLite 3.45 WAL)                │
+│                                                                                   │
+│   ┌───────────────────────────────┐       ┌───────────────────────────────────┐   │
+│   │     Authentication Tables     │       │    Legacy Workforce Analytics     │   │
+│   │  • users (Bcrypt, AES-256 MFA)│       │  • departments (6 departments)    │   │
+│   │  • roles & permissions (RBAC) │◄──────┤  • employees (54 records)         │   │
+│   │  • refresh_tokens (Families)  │       │  • attendance (1,188+ records)    │   │
+│   │  • user_sessions (Devices)    │       │  • activity_logs (54 events)      │   │
+│   │  • mfa_recovery_codes (Hashed)│       └───────────────────────────────────┘   │
+│   │  • auth_audit_logs (Immutable)│       ┌───────────────────────────────────┐   │
+│   │  • account_lockouts           │       │  • schema_migrations (001..007)   │   │
+│   └───────────────────────────────┘       └───────────────────────────────────┘   │
+│                                                                                   │
+│   PRAGMA foreign_keys = ON  |  PRAGMA journal_mode = WAL                          │
+└───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## ✨ Key Features & Task 2 Deliverables
+## 📦 SQLite Database Migration Engine
 
-### 1. UI/UX Development
-- **Responsive Layout**: Designed for seamless viewport transitions across Mobile (`xs`), Tablet (`sm`/`md`), and Desktop (`lg`/`xl`).
-- **Sidebar & TopNav**: Stackly brand identity, Yuvaraj user profile (`yuvaraj@stackly.io`), quick theme toggling (Dark/Light), notifications badge, and clean collapsible navigation.
-- **Scrollbar Suppression**: Native browser scrollbars suppressed cleanly across all viewports while retaining full smooth scrolling.
+Migrations are located in `server/migrations/` and run automatically on server launch or via CLI:
 
-### 2. Dashboard Analytics & 5 Live KPI Pods
-- **Total Employees**: Dynamic count across global workforce hubs.
-- **Present Today**: Aggregated on-site and remote employees with positive trend velocity.
-- **Absent**: Unscheduled absences with baseline comparisons.
-- **On Leave**: Active medical, maternity, and PTO allowances.
-- **Attendance Rate**: Real-time percentage attendance velocity versus corporate benchmark (88.0%).
+1. `001_create_users.sql` – Users, bcrypt password hash, AES-256 encrypted MFA secret, employee foreign key.
+2. `002_create_roles_permissions.sql` – Roles (`admin`, `hr`, `manager`, `team_lead`, `employee`), 13 permissions, mapping table.
+3. `003_create_refresh_tokens.sql` – Refresh token hashes, UUID token families, revocation status.
+4. `004_create_audit_logs.sql` – Security audit logs tracking events, status, IP, and User-Agent.
+5. `005_create_account_lockouts.sql` – Brute-force account lockout state and failed attempt counters.
+6. `006_create_user_sessions.sql` – Multi-device active session tracking.
+7. `007_create_mfa_recovery_codes.sql` – SHA-256 hashed one-time backup recovery codes.
 
-### 3. Multi-Dimension Charts
-- **Attendance Trend**: Multi-period area/line chart tracking Present, Absent, On Leave, and Remote staff over time.
-- **Department Distribution**: Bi-metric comparison of Total Staff vs. Present Staff per department.
-- **Workforce Donut**: Interactive breakdown by Employment Type (Full-time, Part-time, Contractor, Intern) with center HUD readout and click-to-filter capability.
+### Migration Commands:
+```bash
+# Check migration status
+npm run migrate:status
 
-### 4. Interactive Employee Directory & Activity
-- **Live Search**: Debounced real-time text search across employee names, roles, departments, and locations.
-- **Column Sorting**: Interactive `TableSortLabel` for Name, Department, Role, Location, Status, and Activity Time.
-- **MUI TablePagination**: Selectable page size (`5`, `10`, `25`, `50`), page switches, and total count badge.
-- **Empty & Error States**: Contextual empty state with reset filter CTA when search yields zero records.
-
----
-
-## 🗄 SQLite Database Design & Schema
-
-The relational schema is configured in `server/db/schema.sql` with foreign key enforcement and Write-Ahead Logging (WAL):
-
-```sql
--- 1. Departments Table
-CREATE TABLE departments (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE,
-  code TEXT NOT NULL UNIQUE,
-  manager TEXT,
-  color TEXT NOT NULL,
-  budget INTEGER DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- 2. Employees Table
-CREATE TABLE employees (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  employee_code TEXT NOT NULL UNIQUE,
-  first_name TEXT NOT NULL,
-  last_name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
-  department_id INTEGER NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
-  role TEXT NOT NULL,
-  employment_type TEXT CHECK(employment_type IN ('Full-time', 'Part-time', 'Contractor', 'Intern')) NOT NULL DEFAULT 'Full-time',
-  location TEXT NOT NULL,
-  status TEXT CHECK(status IN ('active', 'on-leave', 'remote', 'inactive')) NOT NULL DEFAULT 'active',
-  avatar_initials TEXT NOT NULL,
-  joined_date DATE NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- 3. Attendance Records Table
-CREATE TABLE attendance (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-  date DATE NOT NULL,
-  status TEXT CHECK(status IN ('present', 'absent', 'on-leave', 'remote')) NOT NULL,
-  check_in_time TEXT,
-  check_out_time TEXT,
-  work_mode TEXT CHECK(work_mode IN ('Office', 'Remote', 'Hybrid', 'Leave')) DEFAULT 'Office',
-  notes TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(employee_id, date)
-);
-
--- 4. Activity Logs Table
-CREATE TABLE activity_logs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-  action TEXT CHECK(action IN ('check-in', 'check-out', 'leave-requested', 'leave-approved', 'new-hire', 'resigned')) NOT NULL,
-  timestamp DATETIME NOT NULL,
-  details TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- High-performance query indexes
-CREATE INDEX idx_employees_department ON employees(department_id);
-CREATE INDEX idx_employees_location ON employees(location);
-CREATE INDEX idx_employees_status ON employees(status);
-CREATE INDEX idx_employees_type ON employees(employment_type);
-CREATE INDEX idx_attendance_date ON attendance(date);
-CREATE INDEX idx_attendance_employee ON attendance(employee_id);
-CREATE INDEX idx_activity_timestamp ON activity_logs(timestamp);
+# Run pending migrations
+npm run migrate
 ```
 
 ---
 
-## 🧱 Backend Architecture & Repository Pattern
+## 🔐 Authentication & MFA Implementation
 
-The backend follows the **Repository Pattern** to decouple persistence details from business logic:
-
-1. **`server/db/database.ts`**: SQLite connection singleton with WAL mode and foreign key constraints.
-2. **`server/repositories/EmployeeRepository.ts`**: Handles employee queries, paginated searches, sorting, and employment type breakdowns.
-3. **`server/repositories/AttendanceRepository.ts`**: Aggregates live KPI statistics and multi-day attendance trends.
-4. **`server/repositories/DepartmentRepository.ts`**: Fetches department headcount and attendance metrics.
-5. **`server/controllers/`**: Isolates HTTP request validation, parameter parsing, and JSON response formatting.
-6. **`server/routes/api.ts`**: Maps REST endpoints to controllers.
+- **Password Security:** 12 rounds of bcrypt.
+- **Short-Lived Access Tokens:** 15-minute expiration, held exclusively in React state memory.
+- **Refresh Token Rotation:** HttpOnly, SameSite cookie rotated on every refresh. Replaying an already rotated token triggers immediate revocation of the **entire token family**.
+- **TOTP MFA (Google Authenticator):** RFC 6238 standard. Secrets are encrypted with **AES-256-GCM** before database storage.
+- **Backup Recovery Codes:** 8 single-use codes (format: `XXXX-XXXX`), stored as SHA-256 hashes and consumed on verification.
 
 ---
 
-## 📡 REST API Documentation
+## 🛡️ Role-Based Access Control (RBAC) & IDOR Defense
 
-Base URL: `http://localhost:5000/api` (or proxied via Vite at `http://localhost:5173/api`)
+The platform enforces data boundaries on the backend:
+- **Admin:** Global visibility, user management, audit logs, and database re-seeding.
+- **HR:** Company-wide visibility across all departments and employees.
+- **Manager:** Restricted to employees and metrics belonging to their assigned department.
+- **Team Lead:** Restricted to team members and attendance monitoring in their assigned team.
+- **Employee:** Can only access their own profile and attendance records.
 
-| Method | Endpoint | Query Parameters | Description |
+### IDOR (Insecure Direct Object Reference) Protection:
+`verifyEmployeeOwnership` intercepts attempts to view employee records by ID:
+- An employee requesting `/api/employees/847` (another employee) is blocked with **403 Forbidden**.
+- An `idor_attempt` entry is logged in `auth_audit_logs`.
+
+---
+
+## 💻 Multi-Device Session Management
+
+- Track authenticated devices with browser / OS parsing.
+- View all active sessions in the UI with a distinct "Current Device" badge.
+- Revoke individual sessions remotely.
+- "Logout from all devices" revokes all active sessions and refresh token families.
+
+---
+
+## 🧪 Automated Testing Suite
+
+All tests execute against real SQLite data without mock authentication.
+
+```bash
+# Run full automated test suite with executive summary
+npm test
+```
+
+### Test Results Summary:
+```
+================================================================
+📊 Test Execution Summary Report
+================================================================
+| Suite Type   | Name                                                  | Status  | Time (s) |
+|--------------|-------------------------------------------------------|---------|----------|
+| Unit         | Unit Tests (Crypto, MFA, Sessions, Token Family)      | ✅ PASS  |     4.39 |
+| Integration  | Integration Tests (API, RBAC & Department Scoping)    | ✅ PASS  |     5.96 |
+| Security     | Security Tests (IDOR, SQLi, Lockout, Replay, Escalation) | ✅ PASS  |     7.61 |
+| E2E          | E2E Tests (5 Roles, MFA Flow, Multi-Device Sessions)  | ✅ PASS  |     7.57 |
+================================================================
+Total Suites:   4 | Suites Passed: 4 | Suites Failed: 0
+Total Run Time: 25.54s
+Final Verdict:  🎉 ALL TESTS PASSED (100%)
+================================================================
+```
+
+---
+
+## 📸 Screenshots Gallery
+
+All screenshots are captured at 1200x800 resolution and located in `screenshots/`:
+
+| # | View | File Path | Key Highlights |
 |---|---|---|---|
-| `GET` | `/api/health` | None | Returns server health, database status, and uptime |
-| `GET` | `/api/kpi` | `department`, `location`, `status`, `employmentType` | Returns the 5 core KPI metrics with percentage trends |
-| `GET` | `/api/charts/attendance-trend` | `days` (default 14), `department`, `location` | Multi-day attendance distribution for trend charts |
-| `GET` | `/api/charts/department-distribution` | `location`, `status`, `department` | Headcount and attendance per department |
-| `GET` | `/api/charts/workforce-segments` | `department`, `location`, `status` | Breakdown by employment type for donut charts |
-| `GET` | `/api/employees` | `page`, `limit`, `search`, `sortBy`, `sortOrder`, `department`, `location`, `status`, `employmentType` | Paginated employee records with search and sort |
-| `GET` | `/api/filters/options` | None | Dynamic options for departments, locations, and statuses |
-| `POST` | `/api/seed` | None | Re-seeds database with rich workforce dataset |
+| 01 | **Login Page** | `screenshots/01_login_page.png` | Email & password form, security badges, demo credentials box |
+| 02 | **Admin Dashboard** | `screenshots/02_admin_dashboard.png` | User management table, role assignment, active status toggle |
+| 03 | **HR Dashboard** | `screenshots/03_hr_dashboard.png` | Company-wide KPIs, 30-day attendance velocity, department allocation |
+| 04 | **Manager Dashboard** | `screenshots/04_manager_dashboard.png` | Scoped exclusively to Engineering department data and team members |
+| 05 | **Team Lead Dashboard** | `screenshots/05_team_lead_dashboard.png` | Product & Design team attendance and sprint monitoring |
+| 06 | **Employee Dashboard** | `screenshots/06_employee_dashboard.png` | Personal profile card, attendance summary, timesheet history |
+| 07 | **MFA Setup Modal** | `screenshots/07_mfa_setup.png` | Google Authenticator QR code, manual secret key, 8 backup recovery codes |
+| 08 | **MFA Verification** | `screenshots/08_mfa_verify.png` | 6-digit TOTP input, backup recovery code option |
+| 09 | **Access Denied (403)** | `screenshots/09_access_denied.png` | Shield alert icon, violation explanation, return link |
+| 10 | **Session Management** | `screenshots/10_session_management.png` | Multi-device tracking, current session pill, revoke button, logout-all button |
+| 11 | **Security Audit Logs** | `screenshots/11_audit_log_viewer.png` | Real-time audit trail with event types, IPs, timestamps, and status badges |
+| 12 | **Responsive View** | `screenshots/12_responsive_dashboard.png` | Dual viewport view of tablet (768px) and mobile (375px) responsive layouts |
+| 13 | **SQLite Architecture** | `screenshots/12_sqlite_schema.png` | Visual schema diagram with all 12 tables and foreign key constraints |
 
 ---
 
-## 💻 Frontend Modular Architecture
+## 📚 Technical Documentation Index
 
-```
-src/
-├── components/
-│   ├── charts/
-│   │   ├── AttendanceTrendChart.tsx         # Responsive area/line chart
-│   │   ├── DepartmentDistributionChart.tsx  # Department headcount comparison bar chart
-│   │   └── WorkforceDonutChart.tsx          # Interactive employment type segment donut
-│   ├── common/
-│   │   ├── EmptyState.tsx                   # Filter/search reset CTA
-│   │   ├── ErrorState.tsx                   # Network failure fallback with retry
-│   │   └── LoadingState.tsx                 # Shimmer skeleton layout
-│   ├── filters/
-│   │   └── FilterBar.tsx                    # Multi-select chips, locations, dates
-│   ├── kpi/
-│   │   └── KpiCard.tsx                      # 5 high-impact interactive KPI pods
-│   ├── layout/
-│   │   ├── Layout.tsx                       # Responsive wrapper
-│   │   ├── Sidebar.tsx                      # Stackly navigation & mobile drawer
-│   │   └── TopNav.tsx                       # User profile, search & theme switch
-│   └── tables/
-│       └── RecentActivityTable.tsx          # Directory with search, sorting & pagination
-├── hooks/
-│   ├── useDashboardData.ts                  # Centralized business logic & API synchronization
-│   └── useThemeMode.ts                      # Theme persistence (Dark / Light)
-├── services/
-│   └── api.ts                               # Type-safe client for backend REST API
-├── pages/
-│   └── Dashboard.tsx                        # Main dashboard view
-├── theme/
-│   └── theme.ts                             # Custom Material UI palettes & typography
-└── types/
-    └── index.ts                             # Global TypeScript interfaces
-```
+For in-depth architectural and operational specifications, consult:
+
+1. [Authentication Documentation (`AUTHENTICATION_DOCUMENTATION.md`)](AUTHENTICATION_DOCUMENTATION.md) – JWT architecture, token rotation, TOTP MFA, session tracking, API reference.
+2. [RBAC Permission Matrix (`RBAC_PERMISSION_MATRIX.md`)](RBAC_PERMISSION_MATRIX.md) – Role definitions, 13 granular permissions, endpoint mapping, IDOR defense.
+3. [Database Migrations (`DATABASE_MIGRATIONS.md`)](DATABASE_MIGRATIONS.md) – Migration runner, 7 migration scripts, schema design, legacy table preservation.
+4. [Security Implementation (`SECURITY_IMPLEMENTATION.md`)](SECURITY_IMPLEMENTATION.md) – OWASP Top 10 alignment, AES-256-GCM encryption, rate limiting, lockout, CSP, CORS.
+5. [Testing Report (`TESTING_REPORT.md`)](TESTING_REPORT.md) – Test coverage, methodology, individual test results table, security validation findings.
 
 ---
 
-## 🚀 Installation & Execution Guide
+## 🛠 Installation & Execution Guide
 
-### Prerequisites
-- **Node.js**: v18.0.0 or higher (v22+ tested)
-- **npm**: v9.0.0 or higher
+### 1. Prerequisites
+- **Node.js** v18+ (tested on v22.x)
+- **npm** or **pnpm**
+- **SQLite 3** (embedded via `better-sqlite3`)
 
-### 1. Install Dependencies
+### 2. Setup Environment
 ```bash
+# Clone the repository
+git clone <repository-url>
+cd uiux
+
+# Install dependencies
 npm install
+
+# Configure environment variables (a pre-configured .env is included)
+# Verify .env has:
+# PORT=5000
+# JWT_ACCESS_SECRET=<secret>
+# JWT_REFRESH_SECRET=<secret>
+# MFA_ENCRYPTION_KEY=<32-char-key>
 ```
 
-### 2. Seed Database (Optional — runs automatically on first start)
+### 3. Initialize Database & Run Migrations
 ```bash
-npm run db:seed
+# Apply SQLite migrations
+npm run migrate
+
+# Seed authentication demo users and legacy workforce data
+npm run auth:seed
 ```
 
-### 3. Run Development Environment
-You can run the full-stack system concurrently with a single command:
+### 4. Run the Full Test Suite
 ```bash
+npm test
+```
+
+### 5. Launch Development Servers
+```bash
+# Run both Backend API (port 5000) and Frontend (port 5173) concurrently:
 npm run dev:all
-```
-Or run the backend and frontend separately:
-```bash
-# Terminal 1: Backend Express + SQLite (Port 5000)
+
+# Alternatively, run separately:
+# Terminal 1 (Backend API):
 npm run server
 
-# Terminal 2: Vite React Frontend (Port 5173)
+# Terminal 2 (Vite Frontend):
 npm run dev
 ```
 
-### 4. Build for Production
-```bash
-npm run build
-```
-
----
-
-## 🎨 UI/UX & Accessibility Highlights
-
-- **Branding**: Dedicated to **Stackly** with high-contrast corporate typography and an Indigo-Emerald color harmony.
-- **User Profile**: Active session authenticated as **Yuvaraj** (`yuvaraj@stackly.io`).
-- **Interactive Feedback**:
-  - Segment click on Workforce Donut dynamically filters the activity table.
-  - KPI card clicks filter by active/on-leave employees.
-  - CSV Export downloads filtered datasets instantly.
-- **Accessibility**: Semantic HTML5 tags, ARIA labels on inputs and dialogs, keyboard navigation support, and zero scrollbar clutter.
-
----
-
-## ✅ Verification & Test Results
-
-- **Vite Production Build**: Passed cleanly with `0` TypeScript errors (`tsc -b && vite build`).
-- **SQLite Operations**: 100% functional with WAL mode and foreign key integrity.
-- **REST API Endpoints**: All endpoints (`/api/kpi`, `/api/charts/*`, `/api/employees`, `/api/filters/options`) verified with dynamic query filters, pagination, and sorting.
+Visit **http://localhost:5173** and log in with any of the demo accounts!
