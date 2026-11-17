@@ -215,5 +215,7 @@ export function seedDatabase(): void {
   seedTransaction();
 }
 
-// Auto-run when invoked via CLI
-seedDatabase();
+// Auto-run only when directly invoked via CLI
+if (process.argv[1] && (process.argv[1].endsWith('seed.ts') || process.argv[1].endsWith('seed.js'))) {
+  seedDatabase();
+}

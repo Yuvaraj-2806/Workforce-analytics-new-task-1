@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import { Box, useMediaQuery, useTheme } from '@mui/material';
+import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopNav from './TopNav';
 
 interface LayoutProps {
-  children: React.ReactNode;
-  onThemeToggle: () => void;
-  isDark: boolean;
+  children?: React.ReactNode;
+  onThemeToggle?: () => void;
+  isDark?: boolean;
   onRefresh?: () => void;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, onThemeToggle, isDark, onRefresh }) => {
   const theme = useTheme();
+  const effectiveIsDark = isDark ?? theme.palette.mode === 'dark';
+  const effectiveToggle = onThemeToggle || (() => {});
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -49,8 +52,8 @@ const Layout: React.FC<LayoutProps> = ({ children, onThemeToggle, isDark, onRefr
         }}
       >
         <TopNav
-          onThemeToggle={onThemeToggle}
-          isDark={isDark}
+          onThemeToggle={effectiveToggle}
+          isDark={effectiveIsDark}
           onMobileMenuToggle={() => setMobileOpen(true)}
           onRefresh={onRefresh}
         />
@@ -67,7 +70,7 @@ const Layout: React.FC<LayoutProps> = ({ children, onThemeToggle, isDark, onRefr
             p: { xs: 2, sm: 2.5, md: 3 },
           }}
         >
-          {children}
+          {children || <Outlet />}
         </Box>
       </Box>
     </Box>
@@ -75,3 +78,4 @@ const Layout: React.FC<LayoutProps> = ({ children, onThemeToggle, isDark, onRefr
 };
 
 export default Layout;
+

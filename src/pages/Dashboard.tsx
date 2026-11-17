@@ -130,6 +130,7 @@ const Dashboard: React.FC = () => {
               <StorageRoundedIcon sx={{ fontSize: 13 }} />
               SQLite Connected
             </Box>
+
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.825rem' }}>

@@ -25,3 +25,9 @@ dist-ssr
 
 # SQLite Database
 data/*.sqlite*
+
+# Environment Variables (NEVER commit secrets)
+.env
+.env.*
+!.env.example
+

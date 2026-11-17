@@ -7,6 +7,7 @@ import type {
   FilterState,
   FilterOptions,
 } from '../types';
+import { authFetch } from './authApi';
 
 const API_BASE = '/api';
 
@@ -36,7 +37,7 @@ export const apiService = {
       status: filters.status,
       employmentType: filters.employmentType,
     });
-    const res = await fetch(`${API_BASE}/kpi${qs}`);
+    const res = await authFetch(`${API_BASE}/kpi${qs}`);
     if (!res.ok) throw new Error(`Failed to fetch KPIs: ${res.statusText}`);
     const json = await res.json();
     return json.data;
@@ -51,7 +52,7 @@ export const apiService = {
       department: filters.department,
       location: filters.location,
     });
-    const res = await fetch(`${API_BASE}/charts/attendance-trend${qs}`);
+    const res = await authFetch(`${API_BASE}/charts/attendance-trend${qs}`);
     if (!res.ok) throw new Error(`Failed to fetch attendance trend: ${res.statusText}`);
     const json = await res.json();
     return json.data;
@@ -66,7 +67,7 @@ export const apiService = {
       location: filters.location,
       status: filters.status,
     });
-    const res = await fetch(`${API_BASE}/charts/department-distribution${qs}`);
+    const res = await authFetch(`${API_BASE}/charts/department-distribution${qs}`);
     if (!res.ok) throw new Error(`Failed to fetch department distribution: ${res.statusText}`);
     const json = await res.json();
     return json.data;
@@ -81,7 +82,7 @@ export const apiService = {
       location: filters.location,
       status: filters.status,
     });
-    const res = await fetch(`${API_BASE}/charts/workforce-segments${qs}`);
+    const res = await authFetch(`${API_BASE}/charts/workforce-segments${qs}`);
     if (!res.ok) throw new Error(`Failed to fetch workforce segments: ${res.statusText}`);
     const json = await res.json();
     return { data: json.data, total: json.total };
@@ -99,17 +100,17 @@ export const apiService = {
     sortOrder?: 'asc' | 'desc';
   }): Promise<{ items: EmployeeActivity[]; total: number; totalPages: number }> {
     const qs = buildQuery({
-      page: params.page,
-      limit: params.limit,
-      search: params.search,
-      sortBy: params.sortBy,
-      sortOrder: params.sortOrder,
       department: params.filters.department,
       location: params.filters.location,
       status: params.filters.status,
       employmentType: params.filters.employmentType,
+      search: params.search,
+      page: params.page,
+      limit: params.limit,
+      sortBy: params.sortBy,
+      sortOrder: params.sortOrder,
     });
-    const res = await fetch(`${API_BASE}/employees${qs}`);
+    const res = await authFetch(`${API_BASE}/employees${qs}`);
     if (!res.ok) throw new Error(`Failed to fetch employees: ${res.statusText}`);
     const json = await res.json();
     return {
@@ -120,20 +121,42 @@ export const apiService = {
   },
 
   /**
-   * Fetches available dynamic filter options
+   * Fetches single employee by ID (with backend IDOR protection)
    */
-  async getFilterOptions(): Promise<FilterOptions> {
-    const res = await fetch(`${API_BASE}/filters/options`);
-    if (!res.ok) throw new Error(`Failed to fetch filter options: ${res.statusText}`);
+  async getEmployeeById(id: number): Promise<EmployeeActivity> {
+    const res = await authFetch(`${API_BASE}/employees/${id}`);
+    if (!res.ok) throw new Error(`Failed to fetch employee: ${res.statusText}`);
     const json = await res.json();
     return json.data;
   },
 
   /**
-   * Triggers a database reseed
+   * Fetches the current logged-in employee's own profile
    */
-  async reseedDatabase(): Promise<void> {
-    const res = await fetch(`${API_BASE}/seed`, { method: 'POST' });
-    if (!res.ok) throw new Error('Failed to reseed database');
+  async getMyProfile(): Promise<any> {
+    const res = await authFetch(`${API_BASE}/my-profile`);
+    if (!res.ok) throw new Error(`Failed to fetch profile: ${res.statusText}`);
+    const json = await res.json();
+    return json.data;
+  },
+
+  /**
+   * Fetches the current logged-in employee's attendance records
+   */
+  async getMyAttendance(days: number = 30): Promise<any[]> {
+    const res = await authFetch(`${API_BASE}/my-attendance?days=${days}`);
+    if (!res.ok) throw new Error(`Failed to fetch personal attendance: ${res.statusText}`);
+    const json = await res.json();
+    return json.data;
+  },
+
+  /**
+   * Fetches dynamic filter options
+   */
+  async getFilterOptions(): Promise<FilterOptions> {
+    const res = await authFetch(`${API_BASE}/filters/options`);
+    if (!res.ok) throw new Error(`Failed to fetch filter options: ${res.statusText}`);
+    const json = await res.json();
+    return json.data;
   },
 };

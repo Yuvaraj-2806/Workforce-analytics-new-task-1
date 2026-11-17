@@ -22,8 +22,27 @@ import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded';
 import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded';
 import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
-import { departmentOptions as defaultDepartmentOptions, locationOptions as defaultLocationOptions, statusOptions as defaultStatusOptions } from '../../data/mockData';
 import type { FilterState, FilterOptions } from '../../types';
+
+const defaultDepartmentOptions = [
+  'Engineering',
+  'Product & Design',
+  'Sales & Marketing',
+  'Human Resources',
+  'Finance & Ops',
+  'Customer Support',
+];
+const defaultLocationOptions = [
+  'San Francisco, CA',
+  'New York, NY',
+  'Austin, TX',
+  'Remote',
+];
+const defaultStatusOptions = [
+  'Active',
+  'On Leave',
+  'Remote',
+];
 
 interface FilterBarProps {
   filters: FilterState;
@@ -414,7 +433,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange, filterOptions 
                 )
               }
             >
-              {departmentList.map((dept) => (
+              {departmentList.map((dept: string) => (
                 <MenuItem key={dept} value={dept} dense sx={{ borderRadius: 1.5, my: 0.25 }}>
                   <Checkbox
                     checked={filters.department.includes(dept)}
@@ -469,7 +488,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange, filterOptions 
                 />
               }
             >
-              {locationList.map((loc) => (
+              {locationList.map((loc: string) => (
                 <MenuItem key={loc} value={loc} dense sx={{ borderRadius: 1.5, my: 0.25 }}>
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
                     {loc}
@@ -517,7 +536,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange, filterOptions 
                 />
               }
             >
-              {statusList.map((s) => (
+              {statusList.map((s: string) => (
                 <MenuItem key={s} value={s} dense sx={{ borderRadius: 1.5, my: 0.25 }}>
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
                     {s}
